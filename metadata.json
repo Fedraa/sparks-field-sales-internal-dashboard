@@ -1,0 +1,8 @@
+{
+  "name": "Sparks Field Sales — Internal Dashboard",
+  "description": "Internal analytics dashboard for field sales performance, location metrics, and Leads & Booking management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
