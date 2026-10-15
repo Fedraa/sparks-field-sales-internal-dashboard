@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Sliders,
   ChevronRight,
-  Database,
   Lock,
 } from 'lucide-react';
 import { EnvironmentBanner } from '../common/EnvironmentBanner';
@@ -26,6 +25,9 @@ interface DashboardLayoutProps {
   isRefreshing?: boolean;
   simulationOptions: SimulationOptions;
   onUpdateSimulation: (opts: Partial<SimulationOptions>) => void;
+  sourceDescription?: string;
+  isError?: boolean;
+  isMock?: boolean;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -37,6 +39,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   isRefreshing = false,
   simulationOptions,
   onUpdateSimulation,
+  sourceDescription,
+  isError = false,
+  isMock = false,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
@@ -67,6 +72,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       <EnvironmentBanner
         lastUpdated={lastUpdated}
         onOpenAudit={() => onTabChange('data-quality')}
+        sourceDescription={sourceDescription}
+        isError={isError}
+        isMock={isMock}
       />
 
       <div className="flex flex-1 relative overflow-hidden">
@@ -138,7 +146,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <span>Internal Staff Access</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Customer personal data is excluded. Connects to verified Apps Script endpoint upon audit completion.
+              Customer personal data is excluded. Operating via Google Apps Script (Clean_EC_Visits).
             </p>
           </div>
         </aside>
@@ -169,11 +177,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               {/* Testing Simulator Toggle */}
               <button
                 onClick={() => setShowSimModal(!showSimModal)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-                title="Configure Mock Simulation States"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  simulationOptions.enabled
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                    : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                }`}
+                title="Konfigurasi State Simulator / Mock Testing"
               >
                 <Sliders className="w-3.5 h-3.5 text-slate-600" />
-                <span className="hidden sm:inline">State Simulator</span>
+                <span className="hidden sm:inline">
+                  {simulationOptions.enabled ? 'Simulasi Aktif' : 'State Simulator'}
+                </span>
               </button>
 
               {/* Data Refresh Action */}
@@ -203,7 +217,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-slate-700" />
                 <h3 className="text-sm font-semibold text-slate-900">
-                  Data Quality & State Simulator
+                  Data State & Quality Simulator
                 </h3>
               </div>
               <button
@@ -215,14 +229,27 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Verify how the application gracefully handles various data conditions (loading, empty, or error states) prior to production Apps Script connection.
+              Secara default, dashboard menggunakan <strong>Data Aktual dari Google Sheets</strong>. Simulator ini hanya untuk menguji ketahanan UI saat kondisi khusus.
             </p>
 
             <div className="space-y-3 pt-1">
+              <label className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 cursor-pointer">
+                <div>
+                  <div className="text-xs font-semibold text-amber-950">Aktifkan Mode Simulasi Mock</div>
+                  <div className="text-[11px] text-amber-800">Gunakan mock data alih-alih Google Sheets</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={simulationOptions.enabled || false}
+                  onChange={(e) => onUpdateSimulation({ enabled: e.target.checked })}
+                  className="rounded text-amber-700 focus:ring-amber-500"
+                />
+              </label>
+
               <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
                 <div>
-                  <div className="text-xs font-medium text-slate-900">Simulate Network Error</div>
-                  <div className="text-[11px] text-slate-500">Triggers error state and retry prompt</div>
+                  <div className="text-xs font-medium text-slate-900">Simulasi Network / API Error</div>
+                  <div className="text-[11px] text-slate-500">Memicu ErrorState dan tombol Retry</div>
                 </div>
                 <input
                   type="checkbox"
@@ -234,8 +261,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
               <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
                 <div>
-                  <div className="text-xs font-medium text-slate-900">Simulate Empty Records</div>
-                  <div className="text-[11px] text-slate-500">Displays zero-state placeholders</div>
+                  <div className="text-xs font-medium text-slate-900">Simulasi Empty State (0 Record)</div>
+                  <div className="text-[11px] text-slate-500">Memicu tampilan kosong dan reset filter</div>
                 </div>
                 <input
                   type="checkbox"
@@ -247,7 +274,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
               <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-medium text-slate-900">Simulated Network Latency</span>
+                  <span className="font-medium text-slate-900">Simulasi Latensi Jaringan</span>
                   <span className="font-mono text-slate-600 tabular-nums">
                     {simulationOptions.latencyMs || 0}ms
                   </span>
@@ -267,12 +294,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
               <button
                 onClick={() => {
-                  onUpdateSimulation({ forceError: false, forceEmpty: false, latencyMs: 300 });
+                  onUpdateSimulation({ enabled: false, forceError: false, forceEmpty: false, latencyMs: 0 });
                   setShowSimModal(false);
+                  onRefreshData();
                 }}
                 className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 rounded-md"
               >
-                Reset Defaults
+                Kembali ke Data Aktual
               </button>
               <button
                 onClick={() => {
@@ -281,7 +309,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 }}
                 className="px-3.5 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-md"
               >
-                Apply & Refresh
+                Terapkan & Refresh
               </button>
             </div>
           </div>

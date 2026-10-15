@@ -4,19 +4,23 @@ import {
   ArrowUpDown,
   Building2,
   Users,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   DashboardFilters,
   LocationPerformanceRecord,
   DataState,
 } from '../types/dashboard';
-import { fetchLocationPerformance } from '../services/dashboardService';
+import {
+  fetchLocationPerformance,
+  fetchFilterOptions,
+} from '../services/dashboardService';
 import { DashboardFilterBar } from '../components/filters/DashboardFilterBar';
 import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorState } from '../components/common/ErrorState';
 
-type SortField = 'totalLeads' | 'totalBookings' | 'conversionRate' | 'locationName';
+type SortField = 'totalVisits' | 'totalLeads' | 'totalBookings' | 'conversionRate' | 'locationName';
 type SortDirection = 'asc' | 'desc';
 
 interface LocationPerformancePageProps {
@@ -37,24 +41,35 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
     isLoading: true,
     error: null,
     lastUpdated: null,
-    isMock: true,
+    isMock: false,
+    sourceDescription: 'Memuat...',
   });
 
   const [sortField, setSortField] = useState<SortField>('totalLeads');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [filterOptions, setFilterOptions] = useState<{
+    centers: string[];
+    locations: string[];
+    ecs: string[];
+  }>({ centers: [], locations: [], ecs: [] });
 
   const loadData = async () => {
     setLocationsState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      const res = await fetchLocationPerformance(filters);
+      const [res, optionsRes] = await Promise.all([
+        fetchLocationPerformance(filters, false),
+        fetchFilterOptions(),
+      ]);
       setLocationsState(res);
-    } catch {
+      setFilterOptions(optionsRes);
+    } catch (err: any) {
       setLocationsState({
         data: null,
         isLoading: false,
-        error: 'Failed to load location performance records.',
+        error: err.message || 'Gagal memuat performa lokasi dari Apps Script.',
         lastUpdated: null,
-        isMock: true,
+        isMock: false,
+        sourceDescription: 'Koneksi Gagal',
       });
     }
   };
@@ -96,8 +111,10 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
           onFilterChange={onFilterChange}
           onResetFilters={onResetFilters}
           showLocationFilter={false}
+          centerOptions={filterOptions.centers}
+          ecOptions={filterOptions.ecs}
         />
-        <LoadingState message="Aggregating standardized location performance records..." rows={6} />
+        <LoadingState message="Mengelompokkan data kunjungan per lokasi retail..." rows={6} />
       </div>
     );
   }
@@ -110,8 +127,14 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
           onFilterChange={onFilterChange}
           onResetFilters={onResetFilters}
           showLocationFilter={false}
+          centerOptions={filterOptions.centers}
+          ecOptions={filterOptions.ecs}
         />
-        <ErrorState error={locationsState.error} onRetry={loadData} />
+        <ErrorState
+          title="Koneksi Google Apps Script Terkendala"
+          error={locationsState.error}
+          onRetry={loadData}
+        />
       </div>
     );
   }
@@ -124,14 +147,14 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Location Performance
+            Performa Titik Lokasi
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Aggregated Leads, confirmed Bookings, and conversion metrics by standardized field location.
+            Agregasi jumlah Kunjungan, Leads, Booking, dan rasio konversi per lokasi booth lapangan.
           </p>
         </div>
         <div className="text-xs text-slate-500">
-          Showing <span className="font-mono tabular-nums font-semibold text-slate-900">{sortedLocations.length}</span> locations
+          Menampilkan <span className="font-mono tabular-nums font-semibold text-slate-900">{sortedLocations.length}</span> lokasi aktif
         </div>
       </div>
 
@@ -141,12 +164,14 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
         onFilterChange={onFilterChange}
         onResetFilters={onResetFilters}
         showLocationFilter={false}
+        centerOptions={filterOptions.centers}
+        ecOptions={filterOptions.ecs}
       />
 
       {isEmpty ? (
         <EmptyState
-          title="No locations match your filter"
-          description="Adjust your Center or search query to review other retail locations."
+          title="Tidak ada lokasi yang cocok"
+          description="Ubah filter Center atau kata kunci pencarian untuk melihat lokasi lainnya."
           onResetFilters={onResetFilters}
         />
       ) : (
@@ -161,16 +186,25 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
                       className="flex items-center gap-1.5 hover:text-slate-900 font-semibold"
                     >
                       <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Standardized Location</span>
+                      <span>Nama Lokasi Standar</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </button>
                   </th>
-                  <th className="py-3 px-4">Center / Region</th>
+                  <th className="py-3 px-4">Center Terdekat (centerNearest)</th>
                   <th className="py-3 px-4 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Active ECs</span>
+                      <span>Field EC</span>
                     </div>
+                  </th>
+                  <th className="py-3 px-4 text-right">
+                    <button
+                      onClick={() => handleSort('totalVisits')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 ml-auto font-semibold"
+                    >
+                      <span>Kunjungan</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </button>
                   </th>
                   <th className="py-3 px-4 text-right">
                     <button
@@ -186,7 +220,7 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
                       onClick={() => handleSort('totalBookings')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 ml-auto font-semibold"
                     >
-                      <span>Total Bookings</span>
+                      <span>Total Booking</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </button>
                   </th>
@@ -195,26 +229,31 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
                       onClick={() => handleSort('conversionRate')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 ml-auto font-semibold"
                     >
-                      <span>Conversion</span>
+                      <span>Booking Share</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </button>
                   </th>
-                  <th className="py-3 px-4 text-right">Site Status</th>
+                  <th className="py-3 px-4 text-right">Standardisasi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedLocations.map((loc) => (
                   <tr key={loc.locationId} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900">{loc.locationName}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{loc.locationId}</div>
+                      <div className="font-semibold text-slate-900">
+                        {loc.locationName === 'Unknown Location' ? 'Belum Terpetakan' : loc.locationName}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      <div>{loc.center}</div>
-                      <div className="text-[11px] text-slate-400">{loc.region}</div>
+                      <div>
+                        {loc.center === 'Unassigned Center' ? 'Center Belum Diisi' : loc.center}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-center font-mono tabular-nums text-slate-700">
                       {loc.activeEcsCount}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-600">
+                      {loc.totalVisits}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-medium text-slate-900">
                       {loc.totalLeads}
@@ -226,9 +265,8 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
                       {loc.conversionRate}%
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {/* Zero-pill: clean text with subtle styling */}
                       <span className="text-[11px] font-medium text-slate-600">
-                        {loc.status === 'active' ? 'Active Booth' : 'Temporary'}
+                        {loc.matchStatus || 'Standard'}
                       </span>
                     </td>
                   </tr>

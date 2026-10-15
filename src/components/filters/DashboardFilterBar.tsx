@@ -9,6 +9,9 @@ interface DashboardFilterBarProps {
   onResetFilters: () => void;
   showLocationFilter?: boolean;
   showEcFilter?: boolean;
+  centerOptions?: string[];
+  locationOptions?: string[];
+  ecOptions?: string[];
 }
 
 export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
@@ -17,6 +20,9 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   onResetFilters,
   showLocationFilter = true,
   showEcFilter = true,
+  centerOptions,
+  locationOptions,
+  ecOptions,
 }) => {
   const isFiltered =
     filters.center !== 'all' ||
@@ -24,6 +30,10 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
     filters.ecId !== 'all' ||
     filters.locationId !== 'all' ||
     filters.searchQuery !== '';
+
+  const activeCenters = centerOptions && centerOptions.length > 0 ? centerOptions : MOCK_CENTERS;
+  const activeLocations = locationOptions && locationOptions.length > 0 ? locationOptions : MOCK_LOCATIONS.map(l => l.locationName);
+  const activeEcs = ecOptions && ecOptions.length > 0 ? ecOptions : MOCK_ECS.map(e => e.ecName);
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-3.5 mb-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
@@ -35,16 +45,16 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
             <span>Filters</span>
           </div>
 
-          {/* Center Selector */}
+          {/* Center Selector (Center Terdekat) */}
           <div className="flex items-center">
             <select
               aria-label="Filter by Center"
               value={filters.center}
               onChange={(e) => onFilterChange({ center: e.target.value })}
-              className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors cursor-pointer"
+              className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors cursor-pointer max-w-[200px] truncate"
             >
-              <option value="all">All Centers</option>
-              {MOCK_CENTERS.map((center) => (
+              <option value="all">Semua Center</option>
+              {activeCenters.map((center) => (
                 <option key={center} value={center}>
                   {center}
                 </option>
@@ -61,48 +71,48 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
                 onChange={(e) => onFilterChange({ dateRange: e.target.value as DateRangePreset })}
                 className="text-xs bg-slate-50 border border-slate-200 rounded-md pl-7 pr-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors cursor-pointer"
               >
-                <option value="today">Today (Live)</option>
-                <option value="last_7_days">Last 7 Days</option>
-                <option value="last_30_days">Last 30 Days</option>
-                <option value="this_month">This Month (MTD)</option>
-                <option value="last_month">Last Month</option>
+                <option value="today">Hari Ini (Today)</option>
+                <option value="last_7_days">7 Hari Terakhir</option>
+                <option value="last_30_days">30 Hari Terakhir</option>
+                <option value="this_month">Bulan Ini (MTD)</option>
+                <option value="last_month">Bulan Lalu</option>
               </select>
               <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
 
-          {/* Location Selector (Optional) */}
+          {/* Location Selector */}
           {showLocationFilter && (
             <div className="flex items-center">
               <select
                 aria-label="Filter by Location"
                 value={filters.locationId}
                 onChange={(e) => onFilterChange({ locationId: e.target.value })}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors max-w-[180px] truncate cursor-pointer"
+                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors max-w-[200px] truncate cursor-pointer"
               >
-                <option value="all">All Locations</option>
-                {MOCK_LOCATIONS.map((loc) => (
-                  <option key={loc.locationId} value={loc.locationId}>
-                    {loc.locationName}
+                <option value="all">Semua Lokasi</option>
+                {activeLocations.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          {/* EC Selector (Optional) */}
+          {/* EC Selector */}
           {showEcFilter && (
             <div className="flex items-center">
               <select
                 aria-label="Filter by Field EC"
                 value={filters.ecId}
                 onChange={(e) => onFilterChange({ ecId: e.target.value })}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors max-w-[170px] truncate cursor-pointer"
+                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors max-w-[180px] truncate cursor-pointer"
               >
-                <option value="all">All Field ECs</option>
-                {MOCK_ECS.map((ec) => (
-                  <option key={ec.ecId} value={ec.ecId}>
-                    {ec.ecName} ({ec.ecCode})
+                <option value="all">Semua Field EC</option>
+                {activeEcs.map((ec) => (
+                  <option key={ec} value={ec}>
+                    {ec}
                   </option>
                 ))}
               </select>
@@ -116,7 +126,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search location or EC..."
+              placeholder="Cari lokasi, EC, center..."
               value={filters.searchQuery}
               onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
               className="w-full text-xs bg-slate-50 border border-slate-200 rounded-md pl-8 pr-2.5 py-1.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"

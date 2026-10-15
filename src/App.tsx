@@ -54,6 +54,14 @@ export default function App() {
     setSimOptions((prev) => ({ ...prev, ...opts }));
   };
 
+  const isMock = simOptions.enabled;
+  const isError = simOptions.enabled && Boolean(simOptions.forceError);
+  const sourceDescription = isError
+    ? 'Koneksi Gagal (Simulasi)'
+    : isMock
+      ? 'Simulasi Mock Data'
+      : 'Data Aktual — Google Sheets';
+
   return (
     <DashboardLayout
       activeTab={activeTab}
@@ -63,6 +71,9 @@ export default function App() {
       isRefreshing={isRefreshing}
       simulationOptions={simOptions}
       onUpdateSimulation={handleUpdateSimulation}
+      sourceDescription={sourceDescription}
+      isError={isError}
+      isMock={isMock}
     >
       {activeTab === 'overview' && (
         <OverviewPage
@@ -94,6 +105,9 @@ export default function App() {
 
       {activeTab === 'data-quality' && (
         <DataQualityPage
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
           lastUpdated={lastUpdated}
           onRefreshData={handleRefreshData}
           simulationOptions={simOptions}
