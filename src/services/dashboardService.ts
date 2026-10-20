@@ -430,7 +430,7 @@ export async function fetchLocationPerformance(
     for (const v of filtered) {
       const locKey =
         v.namaLokasiStandard ||
-        (v.locationName && v.locationName.trim() !== '' ? v.locationName : 'Lokasi Tidak Diisi');
+        (v.locationName && v.locationName.trim() !== '' ? v.locationName : 'Lokasi Belum Sesuai');
       let entry = locMap.get(locKey);
       if (!entry) {
         entry = {
@@ -885,13 +885,12 @@ export async function fetchDetailedDataQuality(
       // If standardized (Matched), display standard location name.
       // If unmapped:
       // - If raw locationName exists, display "${locationName} (Belum Terpetakan)"
-      // - If raw locationName is empty, display "Lokasi Tidak Diisi" to clearly distinguish
-      //   an unmapped booth from a visit report where the EC left location completely empty.
+      // - If raw locationName is empty, display "Lokasi Belum Sesuai"
       const locationDisplay = isLocationMapped
         ? v.namaLokasiStandard
         : v.locationName && v.locationName.trim() !== ''
           ? `${v.locationName} (Belum Terpetakan)`
-          : 'Lokasi Tidak Diisi';
+          : 'Lokasi Belum Sesuai';
 
       const centerDisplay = hasCenter ? v.center : 'Center Belum Diisi';
 

@@ -587,11 +587,11 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                       {row.ec}
                     </td>
                     <td className="py-2.5 px-4 max-w-[220px]">
-                      {row.locationDisplay === 'Lokasi Tidak Diisi' ? (
+                      {row.locationDisplay === 'Lokasi Belum Sesuai' ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-amber-700 italic">Lokasi Tidak Diisi</span>
+                          <span className="font-semibold text-amber-700 italic">Lokasi Belum Sesuai</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                            Kosong di Sumber
+                            Perlu Ditinjau
                           </span>
                         </div>
                       ) : (
