@@ -150,6 +150,7 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
           r.standardLocation.toLowerCase().includes(q) ||
           r.centerDisplay.toLowerCase().includes(q) ||
           r.centerNearest.toLowerCase().includes(q) ||
+          (r.buCenter && r.buCenter.toLowerCase().includes(q)) ||
           r.matchStatus.toLowerCase().includes(q)
       );
     }
@@ -421,13 +422,13 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
 
                 <div className="flex items-center justify-between py-1 text-slate-500 text-[11px]">
                   <span>Pemisahan Konsep:</span>
-                  <span>Center kunjungan vs centerNearest (tidak disamakan)</span>
+                  <span>Center booth vs center kelas BU (independen)</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 leading-relaxed">
-              <strong>Aturan Bisnis:</strong> Pengisian center bersifat opsional saat laporan dibuat. Kunjungan tanpa center merupakan kondisi yang diizinkan dan bukan error sistem.
+              <strong>Aturan Bisnis:</strong> Pengisian center booth bersifat opsional saat laporan dibuat. Kunjungan tanpa center booth merupakan kondisi yang diizinkan (74 kunjungan tanpa center booth memiliki center kelas di entri BU).
             </div>
           </div>
         </div>
@@ -586,9 +587,18 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                       {row.ec}
                     </td>
                     <td className="py-2.5 px-4 max-w-[220px]">
-                      <div className="font-semibold text-slate-900 truncate">
-                        {row.locationDisplay}
-                      </div>
+                      {row.locationDisplay === 'Lokasi Tidak Diisi' ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-amber-700 italic">Lokasi Tidak Diisi</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            Kosong di Sumber
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="font-semibold text-slate-900 truncate">
+                          {row.locationDisplay}
+                        </div>
+                      )}
                       {row.rawLocation && row.rawLocation !== row.standardLocation && (
                         <div className="text-[10px] text-slate-400 truncate">
                           Input mentah: {row.rawLocation}
@@ -610,13 +620,20 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`text-[11px] font-medium ${
-                          row.hasCenter ? 'text-slate-800' : 'text-slate-500 italic'
-                        }`}
-                      >
-                        {row.centerDisplay}
-                      </span>
+                      <div>
+                        <span
+                          className={`text-[11px] font-medium ${
+                            row.hasCenter ? 'text-slate-800' : 'text-slate-500 italic'
+                          }`}
+                        >
+                          {row.centerDisplay}
+                        </span>
+                        {!row.hasCenter && row.buCenter && row.buCenter !== '-' && (
+                          <div className="text-[10px] text-slate-500 font-normal">
+                            Kelas BU: {row.buCenter}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">
                       {row.centerNearest}

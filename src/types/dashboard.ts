@@ -115,6 +115,7 @@ export interface DataQualityFollowUpRecord {
   centerDisplay: string;
   hasCenter: boolean;
   centerNearest: string;
+  buCenter?: string;
   buEntriesCount: number;
   leadsCount: number;
   bookingCount: number;

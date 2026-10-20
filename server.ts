@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -31,6 +32,7 @@ interface SanitizedBuEntry {
 }
 
 interface SanitizedVisitRecord {
+  recordId: string;
   timestamp: string;
   ec: string;
   locationName: string;
@@ -99,21 +101,21 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
 
     const responseText = await response.text();
 
-    // Guard: Check if response is HTML (e.g. Google Sign-In redirect or error page)
-    const trimmed = responseText.trim();
-    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.includes('<body')) {
-      res.status(502).json({
-        success: false,
-        error:
-          'Apps Script returned an HTML page instead of JSON. The deployment may require authentication or redirected to a Google login page.',
-      });
-      return;
-    }
-
     let payload: any;
     try {
       payload = JSON.parse(responseText);
     } catch {
+      // If JSON parsing fails, check if the response was an HTML login/error redirect page
+      const trimmed = responseText.trim();
+      if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.includes('<body')) {
+        res.status(502).json({
+          success: false,
+          error:
+            'Apps Script returned an HTML page instead of JSON. The deployment may require authentication or redirected to a Google login page.',
+        });
+        return;
+      }
+
       res.status(502).json({
         success: false,
         error: 'Failed to parse JSON response from Apps Script endpoint.',
@@ -133,7 +135,7 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
 
     // Strict Allowlist Sanitization:
     // Strip all unwanted fields (Parent, Phone, Child, DOB, Age, Notes, raw row data)
-    const sanitizedData: SanitizedVisitRecord[] = rawData.map((item: any) => {
+    const sanitizedData: SanitizedVisitRecord[] = rawData.map((item: any, index: number) => {
       const buEntries: SanitizedBuEntry[] = Array.isArray(item.buEntries)
         ? item.buEntries.map((b: any) => ({
             bu: typeof b.bu === 'string' ? b.bu.trim() : '',
@@ -161,26 +163,62 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
         }
       }
 
+      const timestamp = typeof item.timestamp === 'string' ? item.timestamp : '';
+      const ec = typeof item.ec === 'string' ? item.ec.trim() : '';
+      const locationName =
+        (typeof item.locationName === 'string' && item.locationName.trim()) ||
+        (typeof item.rawLocation === 'string' && item.rawLocation.trim()) ||
+        (typeof item.Nama_Lokasi_Raw === 'string' && item.Nama_Lokasi_Raw.trim()) ||
+        (typeof item.Location === 'string' && item.Location.trim()) ||
+        '';
+
+      // Preserve standard location name without falling back to raw location
+      const namaLokasiStandard =
+        (typeof item.namaLokasiStandard === 'string' && item.namaLokasiStandard.trim()) ||
+        (typeof item.Nama_Lokasi_Standard === 'string' && item.Nama_Lokasi_Standard.trim()) ||
+        '';
+
+      const center = typeof item.center === 'string' ? item.center.trim() : '';
+      const centerNearest =
+        typeof item.centerNearest === 'string' && item.centerNearest.trim() !== ''
+          ? item.centerNearest.trim()
+          : typeof item.Center_Terdekat === 'string'
+            ? item.Center_Terdekat.trim()
+            : '';
+
+      const matchStatus =
+        (typeof item.matchStatus === 'string' && item.matchStatus.trim()) ||
+        (typeof item.Match_Status === 'string' && item.Match_Status.trim()) ||
+        'Unknown';
+
+      const matchMethod =
+        (typeof item.matchMethod === 'string' && item.matchMethod.trim()) ||
+        (typeof item.Match_Method === 'string' && item.Match_Method.trim()) ||
+        'Unknown';
+
+      const matchConfidence =
+        typeof item.matchConfidence === 'number'
+          ? item.matchConfidence
+          : typeof item.Match_Confidence === 'number'
+            ? item.Match_Confidence
+            : 1;
+
+      // Deterministic pseudonymized record ID:
+      // Uses a non-reversible cryptographic hash of immutable non-PII visit attributes and origin position
+      const hashInput = `${timestamp}__${ec}__${locationName}__${namaLokasiStandard}__${center}__${index}`;
+      const recordId = 'REC-' + crypto.createHash('sha256').update(hashInput).digest('hex').slice(0, 10);
+
       return {
-        timestamp: typeof item.timestamp === 'string' ? item.timestamp : '',
-        ec: typeof item.ec === 'string' ? item.ec.trim() : '',
-        locationName: typeof item.locationName === 'string' ? item.locationName.trim() : '',
-        namaLokasiStandard:
-          typeof item.namaLokasiStandard === 'string' && item.namaLokasiStandard.trim() !== ''
-            ? item.namaLokasiStandard.trim()
-            : typeof item.locationName === 'string'
-              ? item.locationName.trim()
-              : '',
-        center: typeof item.center === 'string' ? item.center.trim() : '',
-        centerNearest:
-          typeof item.centerNearest === 'string' && item.centerNearest.trim() !== ''
-            ? item.centerNearest.trim()
-            : typeof item.Center_Terdekat === 'string'
-              ? item.Center_Terdekat.trim()
-              : '',
-        matchStatus: typeof item.matchStatus === 'string' ? item.matchStatus : 'Unknown',
-        matchMethod: typeof item.matchMethod === 'string' ? item.matchMethod : 'Unknown',
-        matchConfidence: typeof item.matchConfidence === 'number' ? item.matchConfidence : 1,
+        recordId,
+        timestamp,
+        ec,
+        locationName,
+        namaLokasiStandard,
+        center,
+        centerNearest,
+        matchStatus,
+        matchMethod,
+        matchConfidence,
         buEntries,
         leadsCount: typeof item.leadsCount === 'number' ? item.leadsCount : computedLeads,
         bookingCount: typeof item.bookingCount === 'number' ? item.bookingCount : computedBookings,

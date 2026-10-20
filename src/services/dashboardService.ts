@@ -428,7 +428,9 @@ export async function fetchLocationPerformance(
     >();
 
     for (const v of filtered) {
-      const locKey = v.namaLokasiStandard || v.locationName || 'Unknown Location';
+      const locKey =
+        v.namaLokasiStandard ||
+        (v.locationName && v.locationName.trim() !== '' ? v.locationName : 'Lokasi Tidak Diisi');
       let entry = locMap.get(locKey);
       if (!entry) {
         entry = {
@@ -869,22 +871,39 @@ export async function fetchDetailedDataQuality(
         uniqueActionNeededCount++;
       }
 
-      // Breakdown by matchStatus
-      if (v.matchStatus === 'Matched') {
+      // Breakdown by matchStatus (robust case handling)
+      const normMatchStatus = (v.matchStatus || '').trim().toLowerCase();
+      if (normMatchStatus === 'matched') {
         matchedStatus++;
-      } else if (v.matchStatus === 'Review') {
+      } else if (normMatchStatus === 'review') {
         reviewStatus++;
       } else {
         unmatchedStatus++;
       }
 
+      // Location display label:
+      // If standardized (Matched), display standard location name.
+      // If unmapped:
+      // - If raw locationName exists, display "${locationName} (Belum Terpetakan)"
+      // - If raw locationName is empty, display "Lokasi Tidak Diisi" to clearly distinguish
+      //   an unmapped booth from a visit report where the EC left location completely empty.
       const locationDisplay = isLocationMapped
         ? v.namaLokasiStandard
         : v.locationName && v.locationName.trim() !== ''
           ? `${v.locationName} (Belum Terpetakan)`
-          : 'Belum Terpetakan';
+          : 'Lokasi Tidak Diisi';
 
       const centerDisplay = hasCenter ? v.center : 'Center Belum Diisi';
+
+      // Extract distinct BU class center(s) for contextual transparency when visit center is unassigned
+      const buCentersList = Array.from(
+        new Set(
+          v.buEntries
+            .map((b) => b.center)
+            .filter((c) => Boolean(c && c.trim()))
+        )
+      );
+      const buCenter = buCentersList.length > 0 ? buCentersList.join(', ') : '-';
 
       followUpRecords.push({
         id: `VISIT-${idx + 1}`,
@@ -901,6 +920,7 @@ export async function fetchDetailedDataQuality(
         centerDisplay,
         hasCenter,
         centerNearest: v.centerNearest || '-',
+        buCenter,
         buEntriesCount: v.totalBUEntries,
         leadsCount: v.leadsCount,
         bookingCount: v.bookingCount,
