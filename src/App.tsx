@@ -21,6 +21,7 @@ const DEFAULT_FILTERS: DashboardFilters = {
   dateRange: 'this_month',
   ecId: 'all',
   locationId: 'all',
+  status: 'all',
   searchQuery: '',
 };
 

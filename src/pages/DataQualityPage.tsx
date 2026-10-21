@@ -151,6 +151,7 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
           r.centerDisplay.toLowerCase().includes(q) ||
           r.centerNearest.toLowerCase().includes(q) ||
           (r.buCenter && r.buCenter.toLowerCase().includes(q)) ||
+          (r.statusSummary && r.statusSummary.toLowerCase().includes(q)) ||
           r.matchStatus.toLowerCase().includes(q)
       );
     }
@@ -587,10 +588,18 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                       {row.ec}
                     </td>
                     <td className="py-2.5 px-4 max-w-[220px]">
-                      {row.locationDisplay === 'Lokasi Belum Sesuai' ? (
+                      {!row.isLocationMapped ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-amber-700 italic">Lokasi Belum Sesuai</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          <span
+                            className={`font-semibold ${
+                              row.locationDisplay === 'Lokasi Belum Sesuai'
+                                ? 'text-amber-700 italic'
+                                : 'text-slate-900'
+                            }`}
+                          >
+                            {row.locationDisplay}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                             Perlu Ditinjau
                           </span>
                         </div>
@@ -599,7 +608,7 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                           {row.locationDisplay}
                         </div>
                       )}
-                      {row.rawLocation && row.rawLocation !== row.standardLocation && (
+                      {row.rawLocation && row.rawLocation.trim() !== '' && row.rawLocation !== row.standardLocation && (
                         <div className="text-[10px] text-slate-400 truncate">
                           Input mentah: {row.rawLocation}
                         </div>
@@ -639,10 +648,43 @@ export const DataQualityPage: React.FC<DataQualityPageProps> = ({
                       {row.centerNearest}
                     </td>
                     <td className="py-2.5 px-4 text-right font-mono tabular-nums whitespace-nowrap">
-                      <span className="font-semibold text-slate-900">{row.buEntriesCount} BU</span>
-                      <span className="text-[11px] text-slate-500 ml-1.5">
-                        (L: {row.leadsCount}, B: {row.bookingCount})
-                      </span>
+                      <div className="font-semibold text-slate-900">{row.buEntriesCount} BU</div>
+                      <div
+                        className="text-[10px] flex items-center justify-end gap-1 flex-wrap mt-0.5"
+                        title={row.statusSummary || `Leads: ${row.leadsCount}, Booking: ${row.bookingCount}`}
+                      >
+                        {row.leadsCount > 0 && (
+                          <span className="px-1 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                            L: {row.leadsCount}
+                          </span>
+                        )}
+                        {row.bookingCount > 0 && (
+                          <span className="px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            B: {row.bookingCount}
+                          </span>
+                        )}
+                        {row.statusBreakdown?.['Potential Booking'] ? (
+                          <span className="px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            Pot: {row.statusBreakdown['Potential Booking']}
+                          </span>
+                        ) : null}
+                        {row.statusBreakdown?.['FU Booking'] ? (
+                          <span className="px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            FU: {row.statusBreakdown['FU Booking']}
+                          </span>
+                        ) : null}
+                        {row.statusBreakdown?.['Rescheduled'] ? (
+                          <span className="px-1 py-0.2 rounded bg-orange-50 text-orange-700 border border-orange-200">
+                            Resched: {row.statusBreakdown['Rescheduled']}
+                          </span>
+                        ) : null}
+                        {row.statusBreakdown?.['Cancelled'] ? (
+                          <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                            Canc: {row.statusBreakdown['Cancelled']}
+                          </span>
+                        ) : null}
+                        {row.buEntriesCount === 0 && <span className="text-slate-400">0 entri</span>}
+                      </div>
                     </td>
                   </tr>
                 ))

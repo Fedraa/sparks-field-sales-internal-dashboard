@@ -25,6 +25,10 @@ import {
   DateRangePreset,
   DataQualityMetrics,
   DataQualityFollowUpRecord,
+  BookingStatus,
+  STATUS_ORDER,
+  ALL_BOOKING_STATUSES,
+  normalizeBookingStatus,
 } from '../types/dashboard';
 import {
   MOCK_LOCATIONS,
@@ -186,13 +190,25 @@ function filterVisits(
       return false;
     }
 
-    // 5. Search query (matches location, EC, or center)
+    // 5. Booking Status filter (matches any BU entry with the selected status)
+    if (filters.status && filters.status !== 'all') {
+      const matchStatus = visit.buEntries.some((b) => {
+        const norm = normalizeBookingStatus(b.status) || b.status;
+        return norm === filters.status;
+      });
+      if (!matchStatus) {
+        return false;
+      }
+    }
+
+    // 6. Search query (matches location, EC, center, or status)
     if (filters.searchQuery && filters.searchQuery.trim() !== '') {
       const q = filters.searchQuery.toLowerCase();
       const matchLoc = (visit.namaLokasiStandard || visit.locationName || '').toLowerCase().includes(q);
       const matchEc = (visit.ec || '').toLowerCase().includes(q);
       const matchCenter = (visit.centerNearest || visit.center || '').toLowerCase().includes(q);
-      if (!matchLoc && !matchEc && !matchCenter) {
+      const matchStatus = visit.buEntries.some((b) => (b.status || '').toLowerCase().includes(q));
+      if (!matchLoc && !matchEc && !matchCenter && !matchStatus) {
         return false;
       }
     }
@@ -279,6 +295,14 @@ export async function fetchOverviewMetrics(
           overallConversionRate: 0,
           activeLocationsCount: 0,
           activeEcCount: 0,
+          statusBreakdown: {
+            'Leads': 0,
+            'Potential Booking': 0,
+            'FU Booking': 0,
+            'Booking': 0,
+            'Rescheduled': 0,
+            'Cancelled': 0,
+          },
         },
         isLoading: false,
         error: null,
@@ -299,6 +323,14 @@ export async function fetchOverviewMetrics(
         overallConversionRate: calculateConversionRate(totalLeads, totalBookings),
         activeLocationsCount: MOCK_LOCATIONS.length,
         activeEcCount: MOCK_ECS.length,
+        statusBreakdown: {
+          'Leads': totalLeads,
+          'Potential Booking': Math.round(totalBookings * 0.15),
+          'FU Booking': Math.round(totalBookings * 0.25),
+          'Booking': totalBookings,
+          'Rescheduled': Math.round(totalBookings * 0.05),
+          'Cancelled': Math.round(totalBookings * 0.05),
+        },
       },
       isLoading: false,
       error: null,
@@ -319,6 +351,15 @@ export async function fetchOverviewMetrics(
     const locationsSet = new Set<string>();
     const ecsSet = new Set<string>();
 
+    const statusBreakdown: Record<BookingStatus, number> = {
+      'Leads': 0,
+      'Potential Booking': 0,
+      'FU Booking': 0,
+      'Booking': 0,
+      'Rescheduled': 0,
+      'Cancelled': 0,
+    };
+
     for (const v of filtered) {
       totalLeads += v.leadsCount;
       totalBookings += v.bookingCount;
@@ -326,6 +367,15 @@ export async function fetchOverviewMetrics(
       const loc = v.namaLokasiStandard || v.locationName;
       if (loc) locationsSet.add(loc);
       if (v.ec) ecsSet.add(v.ec);
+
+      if (v.buEntries && Array.isArray(v.buEntries)) {
+        for (const b of v.buEntries) {
+          const norm = normalizeBookingStatus(b.status);
+          if (norm) {
+            statusBreakdown[norm] = (statusBreakdown[norm] || 0) + 1;
+          }
+        }
+      }
     }
 
     const conversionRate = calculateConversionRate(totalLeads, totalBookings);
@@ -339,6 +389,7 @@ export async function fetchOverviewMetrics(
         overallConversionRate: conversionRate,
         activeLocationsCount: locationsSet.size,
         activeEcCount: ecsSet.size,
+        statusBreakdown,
       },
       isLoading: false,
       error: null,
@@ -424,6 +475,7 @@ export async function fetchLocationPerformance(
         totalBookings: number;
         ecs: Set<string>;
         matchStatus: string;
+        statusBreakdown: Record<BookingStatus, number>;
       }
     >();
 
@@ -441,6 +493,14 @@ export async function fetchLocationPerformance(
           totalBookings: 0,
           ecs: new Set<string>(),
           matchStatus: v.matchStatus || 'Matched',
+          statusBreakdown: {
+            'Leads': 0,
+            'Potential Booking': 0,
+            'FU Booking': 0,
+            'Booking': 0,
+            'Rescheduled': 0,
+            'Cancelled': 0,
+          },
         };
         locMap.set(locKey, entry);
       }
@@ -451,6 +511,15 @@ export async function fetchLocationPerformance(
       if (v.ec) entry.ecs.add(v.ec);
       if (v.centerNearest && !entry.center) {
         entry.center = v.centerNearest;
+      }
+
+      if (v.buEntries && Array.isArray(v.buEntries)) {
+        for (const b of v.buEntries) {
+          const norm = normalizeBookingStatus(b.status);
+          if (norm) {
+            entry.statusBreakdown[norm] = (entry.statusBreakdown[norm] || 0) + 1;
+          }
+        }
       }
     }
 
@@ -466,6 +535,7 @@ export async function fetchLocationPerformance(
         activeEcsCount: item.ecs.size,
         matchStatus: item.matchStatus,
         status: 'active',
+        statusBreakdown: item.statusBreakdown,
       })
     );
 
@@ -558,6 +628,7 @@ export async function fetchEcPerformance(
         totalVisits: number;
         totalLeads: number;
         totalBookings: number;
+        statusBreakdown: Record<BookingStatus, number>;
       }
     >();
 
@@ -572,6 +643,14 @@ export async function fetchEcPerformance(
           totalVisits: 0,
           totalLeads: 0,
           totalBookings: 0,
+          statusBreakdown: {
+            'Leads': 0,
+            'Potential Booking': 0,
+            'FU Booking': 0,
+            'Booking': 0,
+            'Rescheduled': 0,
+            'Cancelled': 0,
+          },
         };
         ecMap.set(ecName, entry);
       }
@@ -588,6 +667,15 @@ export async function fetchEcPerformance(
       const loc = v.namaLokasiStandard || v.locationName;
       if (loc) {
         entry.locationCounts.set(loc, (entry.locationCounts.get(loc) || 0) + 1);
+      }
+
+      if (v.buEntries && Array.isArray(v.buEntries)) {
+        for (const b of v.buEntries) {
+          const norm = normalizeBookingStatus(b.status);
+          if (norm) {
+            entry.statusBreakdown[norm] = (entry.statusBreakdown[norm] || 0) + 1;
+          }
+        }
       }
     }
 
@@ -627,6 +715,7 @@ export async function fetchEcPerformance(
         conversionRate,
         rank: 0,
         tier: 'Core' as 'Top Tier' | 'Core' | 'Developing',
+        statusBreakdown: item.statusBreakdown,
       };
     });
 
@@ -904,12 +993,30 @@ export async function fetchDetailedDataQuality(
       );
       const buCenter = buCentersList.length > 0 ? buCentersList.join(', ') : '-';
 
+      // Extract status breakdown for this visit
+      const visitStatusCounts: Record<string, number> = {};
+      const statusList: string[] = [];
+      if (v.buEntries && Array.isArray(v.buEntries)) {
+        for (const b of v.buEntries) {
+          const norm = normalizeBookingStatus(b.status) || b.status;
+          if (norm) {
+            visitStatusCounts[norm] = (visitStatusCounts[norm] || 0) + 1;
+          }
+        }
+      }
+      for (const st of ALL_BOOKING_STATUSES) {
+        if (visitStatusCounts[st]) {
+          statusList.push(`${st}: ${visitStatusCounts[st]}`);
+        }
+      }
+      const statusSummary = statusList.join(', ');
+
       followUpRecords.push({
         id: `VISIT-${idx + 1}`,
         timestamp: v.timestamp,
         ec: v.ec || 'Tanpa EC',
-        rawLocation: v.locationName || '',
-        standardLocation: v.namaLokasiStandard || '',
+        rawLocation: (typeof v.locationName === 'string' ? v.locationName.trim() : ''),
+        standardLocation: (typeof v.namaLokasiStandard === 'string' ? v.namaLokasiStandard.trim() : ''),
         locationDisplay,
         isLocationMapped,
         matchStatus: v.matchStatus || 'Unknown',
@@ -923,6 +1030,8 @@ export async function fetchDetailedDataQuality(
         buEntriesCount: v.totalBUEntries,
         leadsCount: v.leadsCount,
         bookingCount: v.bookingCount,
+        statusBreakdown: visitStatusCounts,
+        statusSummary,
       });
     });
 

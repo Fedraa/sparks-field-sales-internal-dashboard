@@ -14,6 +14,10 @@ import {
   LocationPerformanceRecord,
   EcPerformanceRecord,
   DataState,
+  ALL_BOOKING_STATUSES,
+  STATUS_ORDER,
+  BOOKING_STATUS_CONFIG,
+  BookingStatus,
 } from '../types/dashboard';
 import {
   fetchOverviewMetrics,
@@ -255,6 +259,116 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               <div className="mt-2 text-[11px] text-slate-500">
                 Cakupan lokasi aktif
               </div>
+            </div>
+          </div>
+
+          {/* 6-Status Booking Flow Pipeline Distribution */}
+          <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Alur 6 Status Booking (Pipeline Flow)
+                  </h2>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium border border-slate-200">
+                    Urutan 1–6
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Distribusi riil seluruh entri BU berdasarkan tahap konversi dari Leads hingga Booking, Rescheduled, atau Cancelled.
+                </p>
+              </div>
+              {filters.status && filters.status !== 'all' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Filter Aktif:</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-900 text-white">
+                    #{STATUS_ORDER[filters.status as BookingStatus] || ''} {filters.status}
+                  </span>
+                  <button
+                    onClick={() => onFilterChange({ status: 'all' })}
+                    className="text-xs text-slate-600 hover:text-slate-900 underline ml-1 cursor-pointer"
+                  >
+                    Reset Filter Status
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {ALL_BOOKING_STATUSES.map((st) => {
+                const conf = BOOKING_STATUS_CONFIG[st];
+                const count = data.statusBreakdown?.[st] || 0;
+                const percentage =
+                  data.totalBUEntries > 0 ? ((count / data.totalBUEntries) * 100).toFixed(1) : '0.0';
+                const isSelected = filters.status === st;
+
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => onFilterChange({ status: isSelected ? 'all' : st })}
+                    className={`p-3 rounded-lg border text-left transition-all relative cursor-pointer ${
+                      isSelected
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/20'
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/80 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span
+                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          isSelected
+                            ? 'bg-slate-800 text-slate-200'
+                            : 'bg-white text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        #{conf.order}
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono tabular-nums ${
+                          isSelected ? 'text-slate-300' : 'text-slate-500'
+                        }`}
+                      >
+                        {percentage}%
+                      </span>
+                    </div>
+
+                    <div
+                      className={`text-xs font-bold truncate ${
+                        isSelected ? 'text-white' : 'text-slate-900'
+                      }`}
+                      title={conf.label}
+                    >
+                      {conf.label}
+                    </div>
+
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span
+                        className={`text-xl font-bold font-mono tabular-nums ${
+                          isSelected ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
+                        {count.toLocaleString()}
+                      </span>
+                      <span
+                        className={`text-[10px] ${
+                          isSelected ? 'text-slate-300' : 'text-slate-500'
+                        }`}
+                      >
+                        entri
+                      </span>
+                    </div>
+
+                    <div
+                      className={`mt-2 text-[10px] line-clamp-2 leading-tight ${
+                        isSelected ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                      title={conf.description}
+                    >
+                      {conf.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

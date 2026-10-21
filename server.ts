@@ -17,7 +17,37 @@ const DEFAULT_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbzZmcsKNDPIXgflD3WuOQwrRYy8sv_HV7KBzLzSMPhefYkXuf7THY_1gFtoI49ErBfYtA/exec';
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL;
 
-app.use(express.json());
+// Standard 6-Status Flow for Sparks Field Sales
+const STATUS_ORDER = {
+  'Leads': 1,
+  'Potential Booking': 2,
+  'FU Booking': 3,
+  'Booking': 4,
+  'Rescheduled': 5,
+  'Cancelled': 6,
+} as const;
+
+type BookingStatus = keyof typeof STATUS_ORDER;
+
+function normalizeBookingStatus(statusStr?: string | null): BookingStatus | null {
+  if (!statusStr || typeof statusStr !== 'string') return null;
+  const s = statusStr.trim().toLowerCase();
+  if (s === 'leads' || s === 'lead') return 'Leads';
+  if (s === 'potential booking' || s === 'potential' || s === 'potential_booking') return 'Potential Booking';
+  if (
+    s === 'fu booking' ||
+    s === 'fu' ||
+    s === 'fu_booking' ||
+    s === 'follow up booking' ||
+    s === 'followup booking' ||
+    s === 'follow-up booking'
+  )
+    return 'FU Booking';
+  if (s === 'booking' || s === 'bookings') return 'Booking';
+  if (s === 'rescheduled' || s === 'reschedule') return 'Rescheduled';
+  if (s === 'cancelled' || s === 'canceled' || s === 'cancel') return 'Cancelled';
+  return null;
+}
 
 // Strict Allowlist Interface for Sanitized Visit Entries
 interface SanitizedBuEntry {
@@ -46,6 +76,7 @@ interface SanitizedVisitRecord {
   leadsCount: number;
   bookingCount: number;
   totalBUEntries: number;
+  statusBreakdown?: Record<string, number>;
 }
 
 /**
@@ -137,31 +168,47 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
     // Strip all unwanted fields (Parent, Phone, Child, DOB, Age, Notes, raw row data)
     const sanitizedData: SanitizedVisitRecord[] = rawData.map((item: any, index: number) => {
       const buEntries: SanitizedBuEntry[] = Array.isArray(item.buEntries)
-        ? item.buEntries.map((b: any) => ({
-            bu: typeof b.bu === 'string' ? b.bu.trim() : '',
-            center: typeof b.center === 'string' ? b.center.trim() : '',
-            status: typeof b.status === 'string' ? b.status.trim() : '',
-            ageGroup: typeof b.ageGroup === 'string' ? b.ageGroup.trim() : '',
-            classDate: typeof b.classDate === 'string' ? b.classDate.trim() : '',
-            classTime: typeof b.classTime === 'string' ? b.classTime.trim() : '',
-            className: typeof b.className === 'string' ? b.className.trim() : '',
-            room: typeof b.room === 'string' ? b.room.trim() : '',
-          }))
+        ? item.buEntries.map((b: any) => {
+            const rawStatus = typeof b.status === 'string' ? b.status.trim() : '';
+            const normalizedStatus = normalizeBookingStatus(rawStatus) || rawStatus;
+            return {
+              bu: typeof b.bu === 'string' ? b.bu.trim() : '',
+              center: typeof b.center === 'string' ? b.center.trim() : '',
+              status: normalizedStatus,
+              ageGroup: typeof b.ageGroup === 'string' ? b.ageGroup.trim() : '',
+              classDate: typeof b.classDate === 'string' ? b.classDate.trim() : '',
+              classTime: typeof b.classTime === 'string' ? b.classTime.trim() : '',
+              className: typeof b.className === 'string' ? b.className.trim() : '',
+              room: typeof b.room === 'string' ? b.room.trim() : '',
+            };
+          })
         : [];
 
-      // Calculate exact Leads and Bookings according to calculation rules:
-      // status === "Leads" -> Lead
-      // status === "Booking" -> Booking
-      let computedLeads = 0;
-      let computedBookings = 0;
+      // Calculate exact counts across the 6-status flow:
+      // Status 1: Leads
+      // Status 2: Potential Booking
+      // Status 3: FU Booking
+      // Status 4: Booking (Confirmed Booking)
+      // Status 5: Rescheduled
+      // Status 6: Cancelled
+      const statusCounts: Record<string, number> = {
+        'Leads': 0,
+        'Potential Booking': 0,
+        'FU Booking': 0,
+        'Booking': 0,
+        'Rescheduled': 0,
+        'Cancelled': 0,
+      };
+
       for (const entry of buEntries) {
-        const s = entry.status.toLowerCase();
-        if (s === 'leads' || s === 'lead') {
-          computedLeads += 1;
-        } else if (s === 'booking' || s === 'bookings') {
-          computedBookings += 1;
+        const s = normalizeBookingStatus(entry.status) || entry.status;
+        if (s) {
+          statusCounts[s] = (statusCounts[s] || 0) + 1;
         }
       }
+
+      const computedLeads = statusCounts['Leads'] || 0;
+      const computedBookings = statusCounts['Booking'] || 0;
 
       const timestamp = typeof item.timestamp === 'string' ? item.timestamp : '';
       const ec = typeof item.ec === 'string' ? item.ec.trim() : '';
@@ -223,6 +270,7 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
         leadsCount: typeof item.leadsCount === 'number' ? item.leadsCount : computedLeads,
         bookingCount: typeof item.bookingCount === 'number' ? item.bookingCount : computedBookings,
         totalBUEntries: typeof item.totalBUEntries === 'number' ? item.totalBUEntries : buEntries.length,
+        statusBreakdown: statusCounts,
       };
     });
 
@@ -232,11 +280,28 @@ app.get('/api/field-sales/data', async (_req: Request, res: Response) => {
     const totalLeads = sanitizedData.reduce((acc, row) => acc + row.leadsCount, 0);
     const totalBooking = sanitizedData.reduce((acc, row) => acc + row.bookingCount, 0);
 
+    const aggregatedStatusBreakdown: Record<string, number> = {
+      'Leads': 0,
+      'Potential Booking': 0,
+      'FU Booking': 0,
+      'Booking': 0,
+      'Rescheduled': 0,
+      'Cancelled': 0,
+    };
+    for (const row of sanitizedData) {
+      if (row.statusBreakdown) {
+        for (const [st, cnt] of Object.entries(row.statusBreakdown)) {
+          aggregatedStatusBreakdown[st] = (aggregatedStatusBreakdown[st] || 0) + cnt;
+        }
+      }
+    }
+
     const summary = {
       totalVisits: typeof payload.summary?.totalVisits === 'number' ? payload.summary.totalVisits : totalVisits,
       totalBUEntries: typeof payload.summary?.totalBUEntries === 'number' ? payload.summary.totalBUEntries : totalBUEntries,
       totalLeads: typeof payload.summary?.totalLeads === 'number' ? payload.summary.totalLeads : totalLeads,
       totalBooking: typeof payload.summary?.totalBooking === 'number' ? payload.summary.totalBooking : totalBooking,
+      statusBreakdown: aggregatedStatusBreakdown,
     };
 
     res.json({

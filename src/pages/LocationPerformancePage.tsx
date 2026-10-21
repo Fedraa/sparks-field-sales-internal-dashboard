@@ -259,7 +259,14 @@ export const LocationPerformancePage: React.FC<LocationPerformancePageProps> = (
                       {loc.totalLeads}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-slate-900">
-                      {loc.totalBookings}
+                      <div>{loc.totalBookings}</div>
+                      {(loc.statusBreakdown?.['Potential Booking'] || loc.statusBreakdown?.['FU Booking']) ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          {loc.statusBreakdown?.['Potential Booking'] ? `Pot: ${loc.statusBreakdown['Potential Booking']}` : ''}
+                          {loc.statusBreakdown?.['Potential Booking'] && loc.statusBreakdown?.['FU Booking'] ? ' · ' : ''}
+                          {loc.statusBreakdown?.['FU Booking'] ? `FU: ${loc.statusBreakdown['FU Booking']}` : ''}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
                       {loc.conversionRate}%

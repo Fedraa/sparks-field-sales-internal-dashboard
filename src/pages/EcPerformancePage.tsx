@@ -323,7 +323,14 @@ export const EcPerformancePage: React.FC<EcPerformancePageProps> = ({
                       {ec.totalLeads}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
-                      {ec.totalBookings}
+                      <div>{ec.totalBookings}</div>
+                      {(ec.statusBreakdown?.['Potential Booking'] || ec.statusBreakdown?.['FU Booking']) ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          {ec.statusBreakdown?.['Potential Booking'] ? `Pot: ${ec.statusBreakdown['Potential Booking']}` : ''}
+                          {ec.statusBreakdown?.['Potential Booking'] && ec.statusBreakdown?.['FU Booking'] ? ' · ' : ''}
+                          {ec.statusBreakdown?.['FU Booking'] ? `FU: ${ec.statusBreakdown['FU Booking']}` : ''}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
                       {ec.conversionRate}%

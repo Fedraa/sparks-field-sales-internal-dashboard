@@ -1,6 +1,6 @@
 import React from 'react';
 import { Filter, Search, RotateCcw, Calendar } from 'lucide-react';
-import { DashboardFilters, DateRangePreset } from '../../types/dashboard';
+import { DashboardFilters, DateRangePreset, ALL_BOOKING_STATUSES, STATUS_ORDER } from '../../types/dashboard';
 import { MOCK_CENTERS, MOCK_ECS, MOCK_LOCATIONS } from '../../data/mockFieldSalesData';
 
 interface DashboardFilterBarProps {
@@ -9,6 +9,7 @@ interface DashboardFilterBarProps {
   onResetFilters: () => void;
   showLocationFilter?: boolean;
   showEcFilter?: boolean;
+  showStatusFilter?: boolean;
   centerOptions?: string[];
   locationOptions?: string[];
   ecOptions?: string[];
@@ -20,6 +21,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   onResetFilters,
   showLocationFilter = true,
   showEcFilter = true,
+  showStatusFilter = true,
   centerOptions,
   locationOptions,
   ecOptions,
@@ -29,6 +31,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
     filters.dateRange !== 'this_month' ||
     filters.ecId !== 'all' ||
     filters.locationId !== 'all' ||
+    (filters.status && filters.status !== 'all') ||
     filters.searchQuery !== '';
 
   const activeCenters = centerOptions && centerOptions.length > 0 ? centerOptions : MOCK_CENTERS;
@@ -113,6 +116,25 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
                 {activeEcs.map((ec) => (
                   <option key={ec} value={ec}>
                     {ec}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Booking Status Flow Selector (6 Statuses) */}
+          {showStatusFilter && (
+            <div className="flex items-center">
+              <select
+                aria-label="Filter by Booking Status"
+                value={filters.status || 'all'}
+                onChange={(e) => onFilterChange({ status: e.target.value })}
+                className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 transition-colors max-w-[190px] truncate cursor-pointer"
+              >
+                <option value="all">Semua Status (6 Alur)</option>
+                {ALL_BOOKING_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {STATUS_ORDER[st]}. {st}
                   </option>
                 ))}
               </select>
