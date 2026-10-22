@@ -75,29 +75,72 @@ async function getRawFieldSalesData(forceFresh: boolean = false): Promise<Actual
     return cachedApiResponse;
   }
 
-  const response = await fetch('/api/field-sales/data', {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch('/api/field-sales/data', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+  } catch (netErr: any) {
+    throw new Error(`Gagal menghubungi server backend: ${netErr.message || 'Koneksi jaringan terputus.'}`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const responseText = await response.text();
+  const trimmed = responseText.trim();
+  const isHtml =
+    contentType.includes('text/html') ||
+    trimmed.startsWith('<!DOCTYPE') ||
+    trimmed.startsWith('<!doctype') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<head>') ||
+    trimmed.includes('<body>');
 
   if (!response.ok) {
     let errMessage = `Server error ${response.status}: ${response.statusText}`;
-    try {
-      const errJson = await response.json();
-      if (errJson?.error) {
-        errMessage = errJson.error;
+    if (isHtml) {
+      if (trimmed.includes('Starting your applet') || trimmed.includes('Starting Server')) {
+        errMessage = 'Server backend sedang memulai ulang (warmup). Silakan coba beberapa saat lagi.';
+      } else if (trimmed.includes('504') || trimmed.includes('Gateway Time-out')) {
+        errMessage = 'Batas waktu koneksi proxy habis (504 Gateway Timeout).';
+      } else if (trimmed.includes('502') || trimmed.includes('Bad Gateway')) {
+        errMessage = 'Server backend proxy mengalami kendala komunikasi (502 Bad Gateway).';
+      } else {
+        errMessage = `Server backend mengembalikan halaman HTML (${response.status} ${response.statusText}) alih-alih data JSON.`;
       }
-    } catch {
-      // response is not json
+    } else {
+      try {
+        const errJson = JSON.parse(responseText);
+        if (errJson?.error) {
+          errMessage = errJson.error;
+        }
+      } catch {
+        if (trimmed) {
+          errMessage = trimmed.slice(0, 150);
+        }
+      }
     }
     throw new Error(errMessage);
   }
 
-  const json: ActualApiResponse = await response.json();
-  if (!json.success || !Array.isArray(json.data)) {
-    throw new Error(json.error || 'Invalid data payload received from Apps Script.');
+  // Response is HTTP 200 OK - verify it is not an unexpected HTML fallback page
+  if (isHtml) {
+    throw new Error(
+      'Endpoint /api/field-sales/data mengembalikan halaman HTML alih-alih data JSON. Pastikan routing backend Express telah aktif.'
+    );
+  }
+
+  let json: ActualApiResponse;
+  try {
+    json = JSON.parse(responseText);
+  } catch {
+    throw new Error('Format data tidak valid: respons backend bukan data JSON yang diharapkan.');
+  }
+
+  if (!json || typeof json !== 'object' || !json.success || !Array.isArray(json.data)) {
+    throw new Error(json?.error || 'Struktur data yang diterima dari Google Apps Script tidak valid.');
   }
 
   cachedApiResponse = json;
